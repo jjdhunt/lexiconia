@@ -1,5 +1,7 @@
 # Lexiconia
 
+See the live map at https://jjdhunt.github.io/lexiconia
+
 ## Overview
 
 A world built of words.
