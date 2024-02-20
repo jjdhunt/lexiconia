@@ -45,4 +45,5 @@ To create the map from the data generated above (in lexiconia_plotting.ipynb):
 
 ### Word List Sources
 https://github.com/first20hours/google-10000-english
+
 https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words
