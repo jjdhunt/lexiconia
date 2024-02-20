@@ -11,7 +11,7 @@ A world built of words.
 ## How the map of Lexiconia was built
 
 To generate data for words (in lexiconia_generation.ipynb):
-1. Use GPT to get definitions of the most common 20k words.
+1. Use GPT to get definitions of the most common 20k words (from https://github.com/first20hours/google-10000-english).
 2. Use the text-embedding-3-small model to get sematic embeddings of (word, definition) pairs.
 3. Use UMAP to project the embeddings to a 2D space.
 4. Use DBSCAN to cluster the points to form 'Lands'.
@@ -42,3 +42,7 @@ To create the map from the data generated above (in lexiconia_plotting.ipynb):
    
    ```sh
    OPENAI_API_KEY=<YOUR API KEY>
+
+### Word List Sources
+https://github.com/first20hours/google-10000-english
+https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words
