@@ -1,6 +1,6 @@
 # Lexiconia
 
-See the live map at https://jjdhunt.github.io/lexiconia
+See the interactive map at https://jjdhunt.github.io/lexiconia
 
 ## Overview
 
