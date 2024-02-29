@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.offline as pyo
 import plotly.graph_objects as go
@@ -6,7 +7,7 @@ from plotly.io import write_image
 import pickle
 import alphashape
 import dash
-from dash import html, dcc
+from dash import html, dcc, Input, Output, State
 import plotly.graph_objs as go
 
 ### load data
@@ -36,7 +37,8 @@ for cluster_id, group in df.groupby('cluster', observed=True):
                     print('multi')
                 else:
                     hull_points = []
-                land_polygons_dict[cluster_id] = hull_points
+                land_polygons_dict[cluster_id] = {"name": f'{group.iloc[0].territory_name} ({group.iloc[0].cluster_topic})',
+                                                  "polygon": hull_points}
                 got_hull = True
             except:
                 alpha = alpha - 1
@@ -131,7 +133,7 @@ def draw_lexiconia_map():
     fig = go.Figure()
 
     for cluster in land_polygons_dict:
-        polygon = land_polygons_dict[cluster]
+        polygon = land_polygons_dict[cluster]["polygon"]
         # fig.add_trace(go.Scatter(x=[p[0] for p in polygon], y=[p[1] for p in polygon], mode='lines', fill='toself'))
         color = cluster_to_color(cluster)
         fig.add_trace(go.Scatter(
@@ -139,18 +141,32 @@ def draw_lexiconia_map():
                                 y=[v[1] for v in polygon], 
                                 mode='lines', 
                                 fill='toself',
+                                text=land_polygons_dict[cluster]["name"],
                                 fillcolor=color, # fill color
                                 line=dict(color=color)  # outline color
                             ))
-        
-    scatter_plot = px.scatter(df, x='umap_1', y='umap_2',
+
+    # draw the lands
+    land_df = df[df['cluster'].astype('int')>=0]
+    land_df["cluster"] = land_df["cluster"].astype('int').astype('category')
+    scatter_plot = px.scatter(land_df, x='umap_1', y='umap_2',
                                     color='cluster',
                                     hover_name='annotation',
                                     hover_data={'umap_1': False, 'umap_2': False, 'cluster': False},
-                                    title='UMAP Projection',
+                                    color_discrete_map=color_map)
+    scatter_plot.update_traces(marker={'size': 2.5}, hoverinfo='skip', hovertemplate=None)
+    for trace in scatter_plot.data:
+        fig.add_trace(trace)
+
+    # draw the seas
+    sea_df = df[df['cluster'].astype('int')<0]
+    sea_df["cluster"] = sea_df["cluster"].astype('int').astype('category')
+    scatter_plot = px.scatter(sea_df, x='umap_1', y='umap_2',
+                                    color='cluster',
+                                    hover_name='annotation',
+                                    hover_data={'umap_1': False, 'umap_2': False, 'cluster': False},
                                     color_discrete_map=color_map)
     scatter_plot.update_traces(marker={'size': 2.5})
-
     for trace in scatter_plot.data:
         fig.add_trace(trace)
 
@@ -187,6 +203,13 @@ config = {
 
 ##### Dash App #####
 
+current_word = df[df['cluster'].astype('int')>=0].sample(1).iloc[0]
+goal_word = df[df['cluster'].astype('int')>=0].sample(1).iloc[0]
+history_words = None
+
+n_submissions = 0
+max_travel_distance = 1
+
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
@@ -196,27 +219,74 @@ app.layout = html.Div([
         config=config,
         style={'height': '90vh'}
     ),
-    dcc.Input(id='term-input', type='text', placeholder='Enter term...')
+    dcc.Input(id='term-input', type='text', placeholder='Enter term...', debounce=True)
 ])
 
-
 @app.callback(
-    dash.dependencies.Output('lexiconia-plot', 'figure'),
-    [dash.dependencies.Input('term-input', 'value')]
+    Output('lexiconia-plot', 'figure'),
+    Input('term-input', 'value'),
+    [State('lexiconia-plot', 'figure')]
 )
-def update_plot(input_value):
+def update_plot(input_value, cur_fig):
+    global current_word
+    global history_words
     fig = go.Figure(base_fig)
+    fig.update_layout(cur_fig['layout'])
     if input_value:
         filtered_df = df[df['term'] == input_value]
         if filtered_df.shape[0]>0:
-            scatter_trace = go.Scatter(
+            scatter_trace = go.Scattergl(
                 x=filtered_df['umap_1'],
                 y=filtered_df['umap_2'],
                 mode='markers',
-                marker=dict(color='red')  # Customize marker color as needed
+                hoverinfo='text',
+                text=filtered_df['annotation'],
+                marker=dict(color='darkred',size=10)
             )
-
             fig.add_trace(scatter_trace)
+
+            #move to the closest point if it is close enough
+            x0 = current_word['umap_1']
+            y0 = current_word['umap_2']
+            filtered_df['distance'] = filtered_df[['umap_1', 'umap_2']].apply(lambda row: np.sqrt((row['umap_1'] - x0)**2 + (row['umap_2'] - y0)**2), axis=1)
+            closest_row = filtered_df.loc[filtered_df['distance'].idxmin()]
+            if closest_row['cluster'].astype('int') >= 0 and closest_row['distance'] <= max_travel_distance:
+                history_words = pd.concat([history_words, current_word.to_frame().T])
+                current_word = closest_row
+
+    # add history words
+    if history_words is not None:
+        scatter_trace = go.Scattergl(
+                x=history_words['umap_1'],
+                y=history_words['umap_2'],
+                mode='markers',
+                hoverinfo='text',
+                text=history_words['annotation'],
+                marker=dict(color='darkgoldenrod',size=10)
+            )
+        fig.add_trace(scatter_trace)
+
+    # add current word
+    scatter_trace = go.Scattergl(
+            x=[current_word['umap_1']],
+            y=[current_word['umap_2']],
+            mode='markers',
+            hoverinfo='text',
+            text=[current_word['annotation']],
+            marker=dict(color='gold',size=10)
+        )
+    fig.add_trace(scatter_trace)
+
+    # add goal word
+    scatter_trace = go.Scattergl(
+            x=[goal_word['umap_1']],
+            y=[goal_word['umap_2']],
+            mode='markers',
+            hoverinfo='text',
+            text=[goal_word['annotation']],
+            marker=dict(color='limegreen',size=10)
+        )
+    fig.add_trace(scatter_trace)
 
     return fig
 
