@@ -1,10 +1,9 @@
 # Lexiconia
+A world built of words.
 
 See the interactive map at https://jjdhunt.github.io/lexiconia
 
 ## Overview
-
-A world built of words.
 
 18,635 words, 41,207 definitions, for an average of 2.2 defintions per word.
 
